@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bouncing DVD Logo with Corner Counter</title>
+    
+    <style>
+        /* CSS Variables */
+        :root {
+            --animation-speed: 8s; 
+            --neon-color1: #00FFFF; 
+            --background-color: #0d001a;
+            --bg-color-primary: #0d001a;
+            --bg-color-secondary: #250050;
+        }
+
+        body {
+            height: 100vh;
+            margin: 0;
+            overflow: hidden; 
+            background-color: var(--bg-color-primary); 
+            display: flex; 
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.5s ease;
+            color: #FFFFFF; /* Ensure text is visible */
+            font-family: Arial, sans-serif;
+        }
+
+        .visual-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+            animation: background-pulse var(--animation-speed) infinite ease-in-out alternate;
+        }
+
+        #dvd-logo {
+            position: absolute; 
+            width: 150px;       
+            height: auto;
+            filter: drop-shadow(0 0 15px var(--neon-color1)); 
+            transition: filter 0.3s ease; 
+            left: -9999px; 
+            top: -9999px; 
+        }
+
+        /* --- NEW STYLES FOR COUNTER AND INFO --- */
+        #info-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            padding: 10px 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            display: none; /* Hide initially */
+            pointer-events: none;
+            text-align: center;
+            border: 2px solid var(--neon-color1);
+        }
+
+        #perfect-hits, #time-taken {
+            margin: 5px 0;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: var(--neon-color1);
+        }
+
+        #startButton {
+            z-index: 10;
+            padding: 15px 30px;
+            font-size: 1.5em;
+            cursor: pointer;
+            background-color: #00FFFF;
+            color: #0d001a;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 0 20px #00FFFF;
+            transition: transform 0.1s;
+        }
+        
+        #startButton:active {
+            transform: scale(0.95);
+        }
+
+        /* KEYFRAMES (unchanged, using variables) */
+        @keyframes background-pulse {
+            0%   { background: radial-gradient(circle, var(--bg-color-primary) 0%, var(--bg-color-secondary) 50%, var(--bg-color-primary) 100%); }
+            50%  { background: radial-gradient(circle, var(--bg-color-secondary) 0%, var(--bg-color-primary) 50%, var(--bg-color-primary) 100%); }
+            100% { background: radial-gradient(circle, var(--bg-color-primary) 0%, var(--bg-color-secondary) 50%, var(--bg-color-primary) 100%); }
+        }
+    </style>
+</head>
+<body>
+    <div class="visual-container">
+        <img id="dvd-logo" src="https://coral-familiar-piranha-435.mypinata.cloud/ipfs/bafkreidkumspmzolzsrahzak4rhttc2m45izwbl3jvnxrn7dskckwikiqu" alt="Bouncing DVD Logo">
+    </div>
+    
+    <div id="info-container">
+        <div id="perfect-hits">Perfect Corners: 0</div>
+        <div id="time-taken">Last Time: N/A</div>
+    </div>
+    
+    <audio id="sound-loop" loop>
+        <source src="loop_sound.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <button id="startButton">Start DVD Bounce</button>
+
+    <script>
+        window.onload = function() {
+            // --- CONFIGURATION ---
+            const SPEED = 3.0; 
+            const COLOR_CYCLE = [
+                { glow: "0 0 15px #00FFFF", primary: "rgba(0, 255, 255, 0.2)", secondary: "rgba(0, 150, 150, 0.1)" }, 
+                { glow: "0 0 15px #FF00FF", primary: "rgba(255, 0, 255, 0.2)", secondary: "rgba(150, 0, 150, 0.1)" }, 
+                { glow: "0 0 15px #00FF00", primary: "rgba(0, 255, 0, 0.2)", secondary: "rgba(0, 150, 0, 0.1)" },     
+                { glow: "0 0 15px #FFFF00", primary: "rgba(255, 255, 0, 0.2)", secondary: "rgba(150, 150, 0, 0.1)" }, 
+                { glow: "0 0 15px #FF4500", primary: "rgba(255, 69, 0, 0.2)", secondary: "rgba(150, 40, 0, 0.1)" },   
+                { glow: "0 0 15px #FFFFFF", primary: "rgba(255, 255, 255, 0.2)", secondary: "rgba(150, 150, 150, 0.1)" }
+            ];
+            
+            // Element references and Root for CSS variables
+            const dvdLogo = document.getElementById('dvd-logo');
+            const soundLoop = document.getElementById('sound-loop');
+            const visualContainer = document.querySelector('.visual-container');
+            const startButton = document.getElementById('startButton');
+            const infoContainer = document.getElementById('info-container'); // NEW
+            const perfectHitsDisplay = document.getElementById('perfect-hits'); // NEW
+            const timeTakenDisplay = document.getElementById('time-taken'); // NEW
+            const root = document.documentElement;
+
+            // --- STATE VARIABLES ---
+            let x = 0; 
+            let y = 0; 
+            let dx = SPEED; 
+            let dy = SPEED; 
+            let colorIndex = 0;
+            
+            let cornerCount = 0; // NEW: Counter for perfect hits
+            let lastCornerTime = 0; // NEW: Timestamp of the last perfect hit
+            
+            // --- Initialization Logic ---
+            function initialize() {
+                const containerW = visualContainer.clientWidth;
+                const containerH = visualContainer.clientHeight;
+                const logoW = dvdLogo.clientWidth;
+                const logoH = dvdLogo.clientHeight;
+
+                x = Math.random() * (containerW - logoW);
+                y = Math.random() * (containerH - logoH);
+                
+                dx = (Math.random() > 0.5 ? 1 : -1) * SPEED;
+                dy = (Math.random() > 0.5 ? 1 : -1) * SPEED;
+
+                dvdLogo.style.left = x + 'px';
+                dvdLogo.style.top = y + 'px';
+                
+                changeColor();
+                infoContainer.style.display = 'block'; // Show the counter
+                lastCornerTime = performance.now(); // Start the timer
+            }
+
+            // --- COLOR CHANGE LOGIC (Unchanged) ---
+            function changeColor() {
+                colorIndex = (colorIndex + 1) % COLOR_CYCLE.length;
+                const newColor = COLOR_CYCLE[colorIndex];
+                
+                dvdLogo.style.filter = `drop-shadow(${newColor.glow})`;
+                root.style.setProperty('--bg-color-primary', newColor.primary);
+                root.style.setProperty('--bg-color-secondary', newColor.secondary);
+            }
+
+            // --- ANIMATION LOOP (Modified for Corner Hit Detection) ---
+            function bounceLogo() {
+                const containerW = visualContainer.clientWidth;
+                const containerH = visualContainer.clientHeight;
+                const logoW = dvdLogo.clientWidth; 
+                const logoH = dvdLogo.clientHeight;
+                
+                let collidedX = false;
+                let collidedY = false;
+
+                // 1. Check for collision with X-axis edges
+                if (x + dx + logoW >= containerW || x + dx <= 0) {
+                    dx = -dx; 
+                    collidedX = true;
+                }
+
+                // 2. Check for collision with Y-axis edges
+                if (y + dy + logoH >= containerH || y + dy <= 0) {
+                    dy = -dy; 
+                    collidedY = true;
+                }
+                
+                // 3. PERFECT CORNER DETECTION (Simultaneous X and Y collision)
+                if (collidedX && collidedY) {
+                    // Increment counter
+                    cornerCount++;
+                    perfectHitsDisplay.textContent = `Perfect Corners: ${cornerCount}`;
+                    
+                    // Calculate Time Interval
+                    const currentTime = performance.now();
+                    const timeDifferenceMs = currentTime - lastCornerTime;
+                    lastCornerTime = currentTime;
+                    
+                    // Format and update display
+                    const seconds = (timeDifferenceMs / 1000).toFixed(2);
+                    timeTakenDisplay.textContent = `Last Time: ${seconds}s`;
+                    
+                    // Optionally, make the logo flash a special color/size for emphasis
+                    dvdLogo.style.transform = 'scale(1.1)';
+                    setTimeout(() => dvdLogo.style.transform = 'scale(1)', 100);
+                }
+
+                // 4. Change color if ANY collision occurred (X OR Y)
+                if (collidedX || collidedY) {
+                    changeColor();
+                }
+
+                // 5. Update position & Clamp position
+                x += dx;
+                y += dy;
+                x = Math.max(0, Math.min(x, containerW - logoW));
+                y = Math.max(0, Math.min(y, containerH - logoH));
+
+                // 6. Apply new position
+                dvdLogo.style.left = x + 'px';
+                dvdLogo.style.top = y + 'px';
+
+                window.requestAnimationFrame(bounceLogo);
+            }
+
+            // --- ENTRY POINT ---
+            startButton.addEventListener('click', startLoop);
+            
+            function startLoop() {
+                startButton.style.display = 'none';
+
+                soundLoop.play().catch(e => {
+                    console.error("Audio failed:", e); 
+                });
+
+                initialize(); 
+                bounceLogo();
+            }
+        };
+    </script>
+</body>
+</html>
